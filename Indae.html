@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>ระบบลงเวลาทำงาน</title>
+  <style>
+    :root {
+      --primary-color: #e0f2fe;
+      --accent-color: #0284c7;
+      --accent-hover: #0369a1;
+      --text-main: #1e293b;
+      --card-bg: #ffffff;
+      --border-color: #bae6fd;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f9ff;
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 420px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px -3px rgba(2, 132, 199, 0.1);
+      border: 1px solid var(--border-color);
+      padding: 28px 24px;
+      box-sizing: border-box;
+    }
+
+    h2 {
+      text-align: center;
+      color: #0369a1;
+      margin-top: 0;
+      margin-bottom: 24px;
+      font-size: 1.4rem;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent-color);
+    }
+
+    input:read-only {
+      background-color: #f8fafc;
+      color: #475569;
+    }
+
+    .btn-group {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-in {
+      background-color: #0284c7;
+      color: white;
+    }
+    .btn-in:hover { background-color: #0369a1; }
+
+    .btn-out {
+      background-color: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #0284c7;
+    }
+    .btn-out:hover { background-color: #bae6fd; }
+
+    #alertBox {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .alert-success { background: #dcfce7; color: #166534; }
+    .alert-error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>⏱️ ลงเวลาปฏิบัติงาน</h2>
+    
+    <div class="form-group">
+      <label>รหัสพนักงาน</label>
+      <input type="text" id="empId" placeholder="พิมพ์รหัสพนักงาน เช่น 001" oninput="lookupEmployee(this.value)">
+    </div>
+
+    <div class="form-group">
+      <label>ชื่อ - นามสกุล</label>
+      <input type="text" id="name" placeholder="แสดงอัตโนมัติ" readonly>
+    </div>
+
+    <!-- ซ่อนช่อง department และ position ไว้ส่งข้อมูลเบื้องหลัง -->
+    <div style="display: none;">
+      <input type="text" id="department" readonly>
+      <input type="text" id="position" readonly>
+    </div>
+
+    <div class="btn-group">
+      <button id="btnIn" class="btn-in" style="display: block;" onclick="submitAttendance('เข้างาน')">📥 ลงเวลาทำงาน</button>
+      <button id="btnOut" class="btn-out" style="display: none;" onclick="submitAttendance('เลิกงาน')">📤 ลงเวลาเลิกงาน</button>
+    </div>
+
+    <div id="alertBox"></div>
+  </div>
+
+  <script>
+    function getComputerId() {
+      let pcId = localStorage.getItem('system_computer_id');
+      if (!pcId) {
+        pcId = 'PC-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Date.now().toString().slice(-4);
+        localStorage.setItem('system_computer_id', pcId);
+      }
+      return pcId;
+    }
+
+    function lookupEmployee(empId) {
+      if (!empId.trim()) {
+        document.getElementById('name').value = '';
+        document.getElementById('department').value = '';
+        document.getElementById('position').value = '';
+        document.getElementById('btnIn').style.display = 'block';
+        document.getElementById('btnOut').style.display = 'none';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.found) {
+            document.getElementById('name').value = res.name;
+            document.getElementById('department').value = res.department || '';
+            document.getElementById('position').value = res.position || '';
+
+            if (res.hasCheckedIn && !res.hasCheckedOut) {
+              document.getElementById('btnIn').style.display = 'none';
+              document.getElementById('btnOut').style.display = 'block';
+            } else if (res.hasCheckedOut) {
+              document.getElementById('btnIn').style.display = 'none';
+              document.getElementById('btnOut').style.display = 'none';
+            } else {
+              document.getElementById('btnIn').style.display = 'block';
+              document.getElementById('btnOut').style.display = 'none';
+            }
+          } else {
+            document.getElementById('name').value = '';
+            document.getElementById('department').value = '';
+            document.getElementById('position').value = '';
+            document.getElementById('btnIn').style.display = 'block';
+            document.getElementById('btnOut').style.display = 'none';
+          }
+        })
+        .getEmployeeInfo(empId);
+    }
+
+    function submitAttendance(type) {
+      const empId = document.getElementById('empId').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const department = document.getElementById('department').value.trim();
+      const position = document.getElementById('position').value.trim();
+      const computerId = getComputerId();
+
+      if (!empId || !name) {
+        showAlert('ไม่พบรหัสพนักงานนี้ในระบบ กรุณาตรวจสอบรหัสอีกครั้ง', 'error');
+        return;
+      }
+
+      showAlert('กำลังขอสิทธิ์ระบุตำแหน่ง GPS...', 'success');
+
+      // บังคับขอพิกัด GPS ก่อนส่งข้อมูล
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            sendDataToServer(empId, name, department, position, type, computerId, lat, lon);
+          },
+          function(error) {
+            showAlert('⚠️ จำเป็นต้องอนุญาตสิทธิ์การเข้าถึงตำแหน่ง (GPS) จึงจะสามารถลงเวลาได้', 'error');
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else {
+        showAlert('⚠️ เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง GPS', 'error');
+      }
+    }
+
+    function sendDataToServer(empId, name, department, position, type, computerId, lat, lon) {
+      const payload = { empId, name, department, position, type, computerId, lat, lon };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showAlert(res.message, res.status === 'success' ? 'success' : 'error');
+          if (res.status === 'success') {
+            if (type !== 'เลิกงาน') {
+              document.getElementById('btnIn').style.display = 'none';
+              document.getElementById('btnOut').style.display = 'block';
+            } else {
+              document.getElementById('empId').value = '';
+              document.getElementById('name').value = '';
+              document.getElementById('department').value = '';
+              document.getElementById('position').value = '';
+              document.getElementById('btnIn').style.display = 'block';
+              document.getElementById('btnOut').style.display = 'none';
+            }
+          }
+        })
+        .recordAttendance(payload);
+    }
+
+    function showAlert(msg, type) {
+      const box = document.getElementById('alertBox');
+      box.style.display = 'block';
+      box.className = type === 'success' ? 'alert-success' : 'alert-error';
+      box.innerText = msg;
+      setTimeout(() => {
+        box.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+
+</body>
+</html>
